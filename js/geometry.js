@@ -251,20 +251,22 @@ function capFaces(paths, z, dir, tri) {
 /** Wall profile: [{t, z}] = offset distance t used from the bed up to height z. */
 export function wallProfile(p) {
   const H = p.bladeHeight;
+  const tip = p.bladeThickness;
+  // Wall thickness / height of 0 mean "no reinforced wall": the wall is the tip thickness all the way up.
+  const wallT = Math.max(p.wallThickness, tip);
   const levels = [];
   const lipT = Math.min(p.lipThickness, H - 0.5);
   const wallTop = Math.max(lipT, Math.min(p.wallHeight, H - 0.5));
-  if (p.lipWidth > 0 && lipT > 0) levels.push({ t: p.wallThickness + p.lipWidth, z: lipT });
-  levels.push({ t: p.wallThickness, z: wallTop });
-  const steps = p.taper > 0 ? 4 : 0;
-  const taperLen = Math.min(p.taper, H - wallTop - 0.4);
-  for (let i = 1; i < steps && taperLen > 0; i++) {
-    levels.push({
-      t: p.wallThickness - (p.wallThickness - p.bladeThickness) * (i / steps),
-      z: wallTop + (taperLen * i) / steps,
-    });
+  if (p.lipWidth > 0 && lipT > 0) levels.push({ t: wallT + p.lipWidth, z: lipT });
+  if (wallT > tip + 1e-6 && wallTop > 0) {
+    levels.push({ t: wallT, z: wallTop });
+    const steps = p.taper > 0 ? 4 : 0;
+    const taperLen = Math.min(p.taper, H - wallTop - 0.4);
+    for (let i = 1; i < steps && taperLen > 0; i++) {
+      levels.push({ t: wallT - (wallT - tip) * (i / steps), z: wallTop + (taperLen * i) / steps });
+    }
   }
-  levels.push({ t: Math.min(p.bladeThickness, p.wallThickness), z: H });
+  levels.push({ t: tip, z: H });
   return { levels, lipT, wallTop };
 }
 

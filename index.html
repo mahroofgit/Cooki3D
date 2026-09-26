@@ -85,6 +85,9 @@
       <button type="button" role="tab" id="t-image" aria-controls="tab-image">Image</button>
       <button type="button" role="tab" id="t-shape" aria-controls="tab-shape">Shapes</button>
       <button type="button" role="tab" id="t-adv" aria-controls="tab-advanced">Advanced</button>
+      <button type="button" class="tab-reset" id="reset" title="Reset all settings" aria-label="Reset all settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg>
+      </button>
     </nav>
 
     <div id="tab-main" class="tabpanel" role="tabpanel" aria-labelledby="t-main">
@@ -115,7 +118,6 @@
     <div id="tab-advanced" class="tabpanel" role="tabpanel" aria-labelledby="t-adv" hidden>
       <ul id="notes" class="warnings"></ul>
       <div id="controls-advanced"></div>
-      <button type="button" class="mini reset" id="reset">Reset all settings</button>
     </div>
   </aside>
 </div>

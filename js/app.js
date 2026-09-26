@@ -22,6 +22,7 @@ const CONTROLS = [
   { id: 'bladeHeight', tab: 'main', label: 'Total height', min: 6, max: 30, step: 0.5, unit: 'mm', stage: MESH, def: 12 },
   { id: 'bladeThickness', tab: 'main', label: 'Tip thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 1.0 },
   { id: 'lipThickness', tab: 'main', label: 'Lip thickness', min: 1, max: 5, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
+  { id: 'lipWidth', tab: 'main', label: 'Flange width', min: 0, max: 20, step: 0.5, unit: 'mm', stage: MESH, def: 10 },
   { id: 'mirror', tab: 'main', label: 'Mirror for printing', type: 'check', stage: SHAPE, def: true },
 
   // Image tab
@@ -42,13 +43,12 @@ const CONTROLS = [
   { id: 'shapeSides', tab: 'shape', label: 'Number of sides', min: 4, max: 30, step: 1, stage: SHAPE, def: 6 },
 
   // Advanced tab
-  { id: 'wallThickness', tab: 'advanced', group: 'Wall', label: 'Wall thickness', min: 0.8, max: 4, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
-  { id: 'wallHeight', tab: 'advanced', group: 'Wall', label: 'Thick wall height', min: 1, max: 25, step: 0.5, unit: 'mm', stage: MESH, def: 6,
+  { id: 'wallThickness', tab: 'advanced', group: 'Wall', label: 'Wall thickness', min: 0, max: 4, step: 0.1, unit: 'mm', stage: MESH, def: 0,
+    hint: '0 keeps the wall the same thickness as the tip all the way up.' },
+  { id: 'wallHeight', tab: 'advanced', group: 'Wall', label: 'Thick wall height', min: 0, max: 25, step: 0.5, unit: 'mm', stage: MESH, def: 0,
     hint: 'Measured from the bed. Above this the wall thins to the tip.' },
-  { id: 'taper', tab: 'advanced', group: 'Wall', label: 'Taper to tip over', min: 0, max: 8, step: 0.5, unit: 'mm', stage: MESH, def: 2,
+  { id: 'taper', tab: 'advanced', group: 'Wall', label: 'Taper to tip over', min: 0, max: 8, step: 0.5, unit: 'mm', stage: MESH, def: 0,
     hint: 'Stepped chamfer between wall and tip. 0 gives a single step.' },
-  { id: 'lipWidth', tab: 'advanced', group: 'Holding lip', label: 'Flange width (beyond wall)', min: 0, max: 12, step: 0.5, unit: 'mm', stage: MESH, def: 5,
-    hint: '0 removes the lip.' },
   { id: 'detailEnabled', tab: 'advanced', group: 'Inner detail stamp', label: 'Add stamp lines for inner details', type: 'check', stage: SHAPE, def: true,
     hint: 'Uses marks inside an uploaded drawing. Basic shapes have none.' },
   { id: 'detailMode', tab: 'advanced', group: 'Inner detail stamp', label: 'Detail source', type: 'select', stage: SHAPE, def: 'auto', options: [
@@ -68,10 +68,18 @@ const CONTROLS = [
     hint: 'Gap between a separate stamp and the cutter wall.' },
 ];
 const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle' };
-const STORE_KEY = 'cooki3d-params-v2';
+const STORE_KEY = 'cooki3d-params-v3';
 
 const params = { ...DEFAULTS };
-try { Object.assign(params, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); } catch { /* storage unavailable */ }
+try {
+  const saved = localStorage.getItem(STORE_KEY);
+  if (saved) Object.assign(params, JSON.parse(saved));
+  else {
+    // Keep settings from the previous version, but apply the new wall and flange defaults once.
+    const old = JSON.parse(localStorage.getItem('cooki3d-params-v2') || '{}');
+    Object.assign(params, old, { wallThickness: 0, wallHeight: 0, taper: 0, lipWidth: 10 });
+  }
+} catch { /* storage unavailable */ }
 
 const $ = s => document.querySelector(s);
 const state = { source: null, name: 'cookie', gray: null, mask: null, w: 0, h: 0, loops: null, shape: null, parts: null };
@@ -188,7 +196,19 @@ function updateVisibility() {
   row('stampClearance').hidden = !(on && params.stampMode === 'separate');
   document.querySelectorAll('.shape-btn').forEach(b => b.setAttribute('aria-pressed', String(shapeMode && b.dataset.id === params.shapeType)));
   document.querySelectorAll('.sample').forEach(b => b.setAttribute('aria-pressed', String(!shapeMode && b.dataset.id === state.name)));
+  requestAnimationFrame(fitPanel);
   $('#source-label').textContent = shapeMode ? `${s.name}` : (state.name === 'cookie' ? 'Your image' : state.name);
+}
+
+/** Phones: size the settings panel to fit the Cutter tab; the 3D view takes all remaining height. */
+function fitPanel() {
+  const panel = $('.panel'), main = $('#tab-main');
+  if (!matchMedia('(max-width: 860px)').matches) { panel.style.removeProperty('--panel-h'); return; }
+  const wasHidden = main.hidden;
+  main.hidden = false;
+  const h = $('.tabs').offsetHeight + main.scrollHeight + 1; // +1 for the panel's top border
+  main.hidden = wasHidden;
+  panel.style.setProperty('--panel-h', h + 'px');
 }
 
 function schedule(stage) {
@@ -467,6 +487,7 @@ function initViewer() {
   scene.add(rim);
   group = new THREE.Group();
   scene.add(group);
+  window.addEventListener('resize', fitPanel);
   const ro = new ResizeObserver(resize);
   ro.observe(host);
   resize();
@@ -560,6 +581,7 @@ function updateStats() {
   if (params.source === 'image' && params.detailEnabled && shape.details.length) N.push(`Stamp lines come from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${Math.abs(params.detailOffset)} mm below the blade.`);
   warn.innerHTML = W.map(([k, t]) => `<li class="${k}">${t}</li>`).join('');
   notes.innerHTML = N.map(t => `<li class="info">${t}</li>`).join('');
+  requestAnimationFrame(fitPanel);
 }
 
 function stlBytes(geometries) {
@@ -653,9 +675,17 @@ function setBusy(b) { $('#busy').hidden = !b; }
 function showError(t) { const e = $('#error'); e.textContent = t; e.hidden = false; setBusy(false); }
 function hideError() { $('#error').hidden = true; }
 let toastTimer = 0;
-function toast(t) {
-  const e = $('#toast'); e.textContent = t; e.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { e.hidden = true; }, 2600);
+function toast(t, actionLabel, action) {
+  const e = $('#toast');
+  e.textContent = t;
+  if (actionLabel) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = actionLabel;
+    b.addEventListener('click', () => { e.hidden = true; action(); });
+    e.appendChild(b);
+  }
+  e.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { e.hidden = true; }, actionLabel ? 6000 : 2600);
 }
 
 function initInput() {
@@ -682,12 +712,16 @@ function initInput() {
     list.appendChild(b);
   }
   $('#reset').addEventListener('click', () => {
-    const keep = { source: params.source, shapeType: params.shapeType };
-    Object.assign(params, DEFAULTS, keep);
+    const before = { ...params };
+    Object.assign(params, DEFAULTS, { source: params.source, shapeType: params.shapeType });
     syncControls();
-    state.autoTune = true;
+    state.autoTune = params.source === 'image';
     schedule(IMG);
-    toast('Settings reset to defaults');
+    toast('All settings reset to defaults', 'Undo', () => {
+      Object.assign(params, before);
+      syncControls();
+      schedule(IMG);
+    });
   });
   $('#view-top').addEventListener('click', () => {
     const d = camera.position.distanceTo(controls.target);

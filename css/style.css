@@ -108,7 +108,7 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 }
 .tabs {
   position: sticky; top: 0; z-index: 2;
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr) auto; align-items: stretch;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   padding-inline: 10px;
@@ -120,6 +120,12 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
   border-bottom: 2.5px solid transparent; margin-bottom: -1px;
 }
 .tabs [role="tab"][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab-reset {
+  border: 0; background: none; cursor: pointer; color: var(--muted);
+  width: 34px; display: grid; place-items: center; padding: 0;
+}
+.tab-reset svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tab-reset:hover { color: var(--accent); }
 .tabpanel { padding: 14px 18px 28px; display: flex; flex-direction: column; gap: 14px; }
 .tabpanel h3, .adv-group h3 {
   margin: 4px 0 0;
@@ -254,24 +260,30 @@ body.dragging .drop-hint { display: grid; }
 .toast {
   position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-weight: 500; z-index: 30;
+  display: flex; align-items: center; gap: 14px; white-space: nowrap;
 }
+.toast button { border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 4px 2px; }
 
 @media (max-width: 860px) {
+  /* Full-height column: header, 3D view (takes all spare room), settings docked at the bottom */
+  html, body { height: 100%; overflow: hidden; }
   .app {
-    height: auto;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas: "bar" "stage" "panel";
-    min-height: 100svh;
+    height: 100%;
+    display: flex; flex-direction: column;
   }
-  /* Leave room below the 3D view for the tab bar and the Cutter settings */
-  .stage { height: max(230px, calc(100svh - 440px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .bar { flex: none; }
+  .stage { flex: 1 1 auto; min-height: 200px; }
+  .panel {
+    flex: none;
+    height: min(var(--panel-h, 44svh), 62svh);
+    overflow-y: auto; overscroll-behavior: contain;
+    border-right: 0; border-top: 1px solid var(--line);
+  }
   .bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px; }
   .brand h1 { font-size: 21px; }
   .icon-btn span { display: none; }
-  .panel { border-right: 0; overflow: visible; }
   .tabs { padding-inline: 6px; }
-  .tabpanel { padding: 10px 16px calc(28px + env(safe-area-inset-bottom, 0px)); }
+  .tabpanel { padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
   .row.compact { min-height: 40px; grid-template-columns: 7.4em 1fr auto; gap: 8px; }
   .stats .print { display: none; }
   /* 16px stops iOS zooming into fields on focus */
