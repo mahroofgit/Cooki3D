@@ -81,6 +81,16 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 .brand h1 { margin: 0; font: 800 23px/1 var(--display); letter-spacing: -0.03em; }
 .brand h1 span { color: var(--accent); }
 .bar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.units {
+  display: inline-flex; padding: 2px; gap: 2px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+}
+.units button {
+  border: 0; background: none; cursor: pointer;
+  min-width: 38px; padding: 4px 8px; border-radius: 7px;
+  font: 500 13px var(--mono); color: var(--muted);
+}
+.units button[aria-checked="true"] { background: var(--raised); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
 .icon-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; }
 .icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .install-help {
@@ -293,5 +303,13 @@ body.dragging .drop-hint { display: grid; }
   .trace-card figcaption { display: none; }
   .fab { width: 52px; height: 52px; }
   .stats { font-size: 11px; }
+}
+@media (max-width: 420px) {
+  .bar { gap: 8px; padding-inline: 12px; }
+  .bar-actions { gap: 6px; }
+  .brand svg { display: none; }
+  #install { padding-inline: 8px; white-space: nowrap; }
+  .units button { min-width: 32px; padding-inline: 6px; }
+  .brand h1 { font-size: 19px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

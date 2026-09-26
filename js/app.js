@@ -67,7 +67,7 @@ const CONTROLS = [
   { id: 'stampClearance', tab: 'advanced', group: 'Inner detail stamp', label: 'Stamp fit clearance', min: 0.2, max: 1.5, step: 0.05, unit: 'mm', stage: MESH, def: 0.5,
     hint: 'Gap between a separate stamp and the cutter wall.' },
 ];
-const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle' };
+const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle', units: 'mm' };
 const STORE_KEY = 'cooki3d-params-v3';
 
 const params = { ...DEFAULTS };
@@ -88,7 +88,24 @@ let timer = 0;
 
 // ---------- Controls ----------
 
+// ---------- Units: everything is stored in mm; inches are display only ----------
+
+const IN = 25.4;
+const inches = () => params.units === 'in';
+const isLength = c => c.unit === 'mm';
+
+/** A length for text: "80 mm" or "3.15 in". */
+function L(mm, mmDecimals = 0) {
+  return inches() ? `${(mm / IN).toFixed(mm / IN >= 10 ? 1 : 2)} in` : `${Number(mm).toFixed(mmDecimals)} mm`;
+}
+/** A pair or triple of lengths sharing one unit: "65 × 80 mm". */
+function Ls(values, mmDecimals = 0) {
+  const u = inches() ? 'in' : 'mm';
+  return values.map(v => (inches() ? (v / IN).toFixed(2) : v.toFixed(mmDecimals))).join(' × ') + ' ' + u;
+}
+
 function fmt(c, v) {
+  if (inches() && isLength(c)) return (v / IN).toFixed(c.step >= 0.5 ? 2 : 3);
   if (c.step >= 1) return String(Math.round(v));
   const d = String(c.step).split('.')[1]?.length ?? 1;
   return Number(v).toFixed(d);
@@ -143,6 +160,7 @@ function buildControls() {
       el.addEventListener('input', () => onChange(parseFloat(el.value)));
       num.addEventListener('change', () => {
         let v = parseFloat(num.value);
+        if (Number.isFinite(v) && inches() && isLength(c)) v = Math.round(v * IN * 1e4) / 1e4;
         if (!Number.isFinite(v)) v = params[c.id];
         v = Math.min(c.max, Math.max(c.min, v));
         el.value = v;
@@ -167,8 +185,28 @@ function setParam(id, v) {
   if (num) num.value = fmt(c, v);
 }
 
+/** Update number boxes, unit labels and slider steps for the current unit. */
+function applyUnits() {
+  const u = inches() ? 'in' : 'mm';
+  for (const c of CONTROLS) {
+    if (!isLength(c)) continue;
+    const el = $('#p-' + c.id), num = $('#n-' + c.id);
+    const unitEl = num.parentElement.querySelector('i');
+    if (unitEl) unitEl.textContent = u;
+    if (inches()) {
+      num.min = (c.min / IN).toFixed(3); num.max = (c.max / IN).toFixed(3); num.step = 'any';
+      el.step = 'any'; // smooth slider; the box shows rounded inches
+    } else {
+      num.min = c.min; num.max = c.max; num.step = c.step; el.step = c.step;
+    }
+    num.value = fmt(c, params[c.id]);
+  }
+  document.querySelectorAll('.units [data-unit]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.unit === u)));
+}
+
 function syncControls() {
   for (const c of CONTROLS) setParam(c.id, params[c.id]);
+  applyUnits();
   updateVisibility();
 }
 
@@ -504,11 +542,15 @@ function resize() {
   if (state.shape) draw2D();
 }
 
+let lastGridSpan = 100;
 function setGrid(size) {
   if (grid) { scene.remove(grid); grid.geometry.dispose(); }
   const css = getComputedStyle(document.documentElement);
-  const n = Math.ceil(size / 10) * 10 + 40;
-  grid = new THREE.GridHelper(n, n / 10, new THREE.Color(css.getPropertyValue('--grid-major').trim()), new THREE.Color(css.getPropertyValue('--grid').trim()));
+  const cell = inches() ? IN / 2 : 10;
+  const cells = Math.ceil((size + 40) / cell / 2) * 2;
+  const n = cells * cell;
+  lastGridSpan = size;
+  grid = new THREE.GridHelper(n, cells, new THREE.Color(css.getPropertyValue('--grid-major').trim()), new THREE.Color(css.getPropertyValue('--grid').trim()));
   grid.rotation.x = Math.PI / 2;
   grid.position.z = -0.01;
   scene.add(grid);
@@ -566,19 +608,20 @@ function updateStats() {
   const vol = volume(parts.cutter) + (parts.stamp ? volume(parts.stamp) : 0);
   const grams = (vol / 1000) * 1.24;
   const cookie = shape.bounds;
-  out.innerHTML = `<b>${(cookie.maxX - cookie.minX).toFixed(0)} × ${(cookie.maxY - cookie.minY).toFixed(0)} mm</b> cookie · ` +
-    `<span class="print">${(bb.max.x - bb.min.x).toFixed(0)} × ${(bb.max.y - bb.min.y).toFixed(0)} × ${bb.max.z.toFixed(0)} mm print · </span>≈ ${grams.toFixed(0)} g`;
-  out.title = `Print size ${(bb.max.x - bb.min.x).toFixed(1)} × ${(bb.max.y - bb.min.y).toFixed(1)} × ${bb.max.z.toFixed(1)} mm`;
+  const pw = bb.max.x - bb.min.x, ph = bb.max.y - bb.min.y;
+  out.innerHTML = `<b>${Ls([cookie.maxX - cookie.minX, cookie.maxY - cookie.minY])}</b> cookie · ` +
+    `<span class="print">${Ls([pw, ph, bb.max.z])} print · </span>≈ ${grams.toFixed(0)} g`;
+  out.title = `Print size ${Ls([pw, ph, bb.max.z], 1)}`;
 
-  if (params.bladeThickness < 0.8) W.push(['warn', 'Tip under 0.8 mm may not print with a 0.4 mm nozzle.']);
-  if (Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) > 220) W.push(['warn', 'Over 220 mm. Check that it fits your printer bed.']);
+  if (params.bladeThickness < 0.8) W.push(['warn', `Tip under ${L(0.8, 1)} may not print with a 0.4 mm nozzle.`]);
+  if (Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) > 220) W.push(['warn', `Over ${L(220)}. Check that it fits your printer bed.`]);
   const narrow = area(offset(offset(shape.outline, -1.6), 1.6)) < area(shape.outline) * 0.985;
-  if (narrow) W.push(['warn', 'Some parts are narrower than 3 mm. Raise “Round corners” to smooth them.']);
+  if (narrow) W.push(['warn', `Some parts are narrower than ${L(3)}. Raise “Round corners” to smooth them.`]);
   const N = [];
   const { wallTop } = wallProfile(params);
-  if (params.wallHeight > params.bladeHeight - 0.5) N.push(`Thick wall is capped at ${wallTop.toFixed(1)} mm so a thinner tip remains.`);
+  if (params.wallHeight > params.bladeHeight - 0.5) N.push(`Thick wall is capped at ${L(wallTop, 1)} so a thinner tip remains.`);
   if (params.source === 'image' && params.detailEnabled && !shape.details.length) N.push('No inner details found, so no stamp lines were added. Try switching the detail source.');
-  if (params.source === 'image' && params.detailEnabled && shape.details.length) N.push(`Stamp lines come from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${Math.abs(params.detailOffset)} mm below the blade.`);
+  if (params.source === 'image' && params.detailEnabled && shape.details.length) N.push(`Stamp lines come from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${L(Math.abs(params.detailOffset), 1)} below the blade.`);
   warn.innerHTML = W.map(([k, t]) => `<li class="${k}">${t}</li>`).join('');
   notes.innerHTML = N.map(t => `<li class="info">${t}</li>`).join('');
   requestAnimationFrame(fitPanel);
@@ -636,10 +679,12 @@ async function save(filename, bytes) {
 function exportName(suffix) {
   if (params.source === 'shape') {
     const sh = shapeById(params.shapeType);
-    const dims = sh.dims === 'd' ? `${Math.round(params.shapeW)}mm` : `${Math.round(params.shapeW)}x${Math.round(params.shapeH)}mm`;
+    const d = v => (inches() ? `${(v / IN).toFixed(2)}in` : `${Math.round(v)}mm`);
+    const dims = sh.dims === 'd' ? d(params.shapeW) : `${d(params.shapeW)}x${d(params.shapeH)}`.replace(/(mm|in)x/, 'x');
     return `cooki3d-${sh.id}-${dims}.stl`;
   }
-  return `cooki3d-${state.name}-${suffix}-${Math.round(params.size)}mm.stl`;
+  const size = inches() ? `${(params.size / IN).toFixed(2)}in` : `${Math.round(params.size)}mm`;
+  return `cooki3d-${state.name}-${suffix}-${size}.stl`;
 }
 
 function initExport() {
@@ -713,7 +758,7 @@ function initInput() {
   }
   $('#reset').addEventListener('click', () => {
     const before = { ...params };
-    Object.assign(params, DEFAULTS, { source: params.source, shapeType: params.shapeType });
+    Object.assign(params, DEFAULTS, { source: params.source, shapeType: params.shapeType, units: params.units });
     syncControls();
     state.autoTune = params.source === 'image';
     schedule(IMG);
@@ -723,6 +768,14 @@ function initInput() {
       schedule(IMG);
     });
   });
+  document.querySelectorAll('.units [data-unit]').forEach(b => b.addEventListener('click', () => {
+    if (params.units === b.dataset.unit) return;
+    params.units = b.dataset.unit;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(params)); } catch { /* ignore */ }
+    applyUnits();
+    setGrid(lastGridSpan);
+    updateStats();
+  }));
   $('#view-top').addEventListener('click', () => {
     const d = camera.position.distanceTo(controls.target);
     camera.position.set(controls.target.x, controls.target.y - 0.001, controls.target.z + d);
