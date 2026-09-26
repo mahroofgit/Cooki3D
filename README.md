@@ -1,6 +1,6 @@
-# Cookie Cutter Forge
+# Cooki3D
 
-Turn a drawing, silhouette or SVG into a print-ready 3D cookie cutter (`.stl`), entirely in the browser. There's no server, no build step and nothing is uploaded. It's a static site made for GitHub Pages.
+Turn a drawing, silhouette, SVG or a basic shape (circle, oval, square, rectangle, triangle, polygon, star, heart, fluted circle) into a print-ready 3D cookie cutter (`.stl`), entirely in the browser. There's no server, no build step and nothing is uploaded. It's a static site made for GitHub Pages.
 
 ## Deploy to GitHub Pages
 
@@ -16,6 +16,14 @@ To run it locally you need a static server, because ES modules don't load from `
 python3 -m http.server 8000   # then open http://localhost:8000
 ```
 
+## Layout
+
+- **Cutter** tab (opens first): longest side (or width × height for a basic shape), round corners, total height, tip thickness, lip thickness, mirror for printing.
+- **Image** tab: upload, examples and image cleanup (threshold, invert, contrast, blur, trace detail).
+- **Shapes** tab: pick a basic shape; set its size on the Cutter tab. Sizes are exact after corner rounding.
+- **Advanced** tab: wall, taper, lip flange width and the inner detail stamp.
+- The round button in the 3D view exports the STL. With a separate stamp it offers cutter + stamp, cutter only or stamp only.
+
 ## Use it on your phone as an app
 
 After the site is live on GitHub Pages:
@@ -23,7 +31,7 @@ After the site is live on GitHub Pages:
 - **iPhone / iPad (Safari):** open the site, tap **Share → Add to Home Screen → Add**. The app's **Install app** button shows these steps.
 - **Android (Chrome):** tap **Install app** in the header, or use **⋮ → Install app / Add to Home screen**.
 
-Launched from its icon, it runs full-screen with no browser bars. It also works offline, because `sw.js` caches every file on the first visit. On a phone, **Download STL** opens the share sheet when the browser supports it (iOS Safari does), so you can pick **Save to Files** or send the STL straight to a printer app. Otherwise the STL goes to your Downloads folder.
+Launched from its icon, it runs full-screen with no browser bars. It also works offline, because `sw.js` caches every file on the first visit. On a phone, the **export** button opens the share sheet when the browser supports it (iOS Safari does), so you can pick **Save to Files** or send the STL straight to a printer app. Otherwise the STL goes to your Downloads folder.
 
 **After changing any file, bump `VERSION` in `sw.js`.** Installed copies then fetch the new files. Because the app shows its cached copy first and refreshes in the background, the change appears on the next launch.
 
@@ -51,16 +59,16 @@ Each detail region becomes a stamp line of the chosen thickness, running along i
 
 | Group | Setting | Default | Notes |
 |---|---|---|---|
-| Shape | Cookie size | 80 | Longest side of the cutting edge (the cookie itself). |
-| | Round off tight corners | 0.8 | Removes notches and spikes narrower than about 2× this. |
+| Shape | Longest side | 80 | Longest side of the cutting edge (the cookie itself). Basic shapes use width × height instead. |
+| | Round corners | 0.8 | Up to 15 mm. Removes notches and spikes narrower than about 2× this. |
 | | Mirror for printing | on | The cutter prints blade-up and is flipped to use, so the print is mirrored to give a cookie that matches the drawing. |
 | Blade | Total height | 12 | From the bed to the cutting tip. |
-| | Tip thickness | 0.9 | Keep ≥ 0.8 for a 0.4 mm nozzle. |
+| | Tip thickness | 1.0 | Keep ≥ 0.8 for a 0.4 mm nozzle. |
 | Wall | Wall thickness | 2.0 | |
 | | Thick wall height | 6 | From the bed. Above this the wall steps down to the tip. |
 | | Taper to tip over | 2 | Four-step chamfer from wall to tip. 0 gives a single step. |
 | Lip | Flange width | 5 | Extends beyond the wall. 0 removes the lip. |
-| | Lip thickness | 2.4 | Also used for the stamp backing plate. |
+| | Lip thickness | 2.0 | Also used for the stamp backing plate. |
 | Stamp | Height offset | −3 | Stamp lines end this far below the blade tip. |
 | | Line thickness | 1.2 | |
 | | Keep clear of the edge | 1.5 | Ignores details this close to the outline. |

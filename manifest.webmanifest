@@ -1,22 +1,57 @@
 {
-  "name": "Cookie Cutter Forge",
-  "short_name": "Cutter Forge",
-  "description": "Turn a drawing into a print-ready 3D cookie cutter STL.",
+  "name": "Cooki3D",
+  "short_name": "Cooki3D",
+  "description": "Turn a drawing or a basic shape into a print-ready 3D cookie cutter STL.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["fullscreen", "standalone"],
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "any",
   "background_color": "#e7ebee",
   "theme_color": "#f7f9fa",
-  "categories": ["utilities", "food"],
+  "categories": [
+    "utilities",
+    "food"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "file_handlers": [
-    { "action": "./", "accept": { "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"], "image/svg+xml": [".svg"] } }
+    {
+      "action": "./",
+      "accept": {
+        "image/png": [
+          ".png"
+        ],
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/svg+xml": [
+          ".svg"
+        ]
+      }
+    }
   ]
 }

@@ -1,10 +1,10 @@
 // Offline support: the whole app is cached on first visit.
 // Bump VERSION whenever you change any file so phones pick up the update.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `cutter-forge-${VERSION}`;
 const APP_SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
-  'js/app.js', 'js/trace.js', 'js/geometry.js', 'js/samples.js', 'js/zip.js', 'js/pwa.js',
+  'js/app.js', 'js/trace.js', 'js/geometry.js', 'js/samples.js', 'js/shapes.js', 'js/zip.js', 'js/pwa.js',
   'lib/clipper.js', 'lib/three/three.module.js',
   'lib/three/addons/controls/OrbitControls.js', 'lib/three/addons/exporters/STLExporter.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',

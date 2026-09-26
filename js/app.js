@@ -6,71 +6,69 @@ import { analyzeShape, buildCutter, offset, area, wallProfile } from './geometry
 import { SAMPLES } from './samples.js';
 import { makeZip } from './zip.js';
 import { initPWA } from './pwa.js';
+import { SHAPES, shapeById, shapeLoop, shapeIcon } from './shapes.js';
 
 // Pipeline stages: a change re-runs its stage and everything after it.
 const IMG = 0, TRACE = 1, SHAPE = 2, MESH = 3;
 
 // Control definitions. Every length is in millimetres.
-const GROUPS = [
-  { title: 'Image cleanup', open: false, controls: [
-    { id: 'threshold', label: 'Threshold', min: 1, max: 254, step: 1, stage: IMG, def: 128, auto: true,
-      hint: 'Pixels darker than this become the shape.' },
-    { id: 'invert', label: 'Invert (light shape on dark background)', type: 'check', stage: IMG, def: false },
-    { id: 'contrast', label: 'Contrast', min: -100, max: 100, step: 1, stage: IMG, def: 0 },
-    { id: 'brightness', label: 'Brightness', min: -100, max: 100, step: 1, stage: IMG, def: 0 },
-    { id: 'blur', label: 'Blur before threshold', min: 0, max: 6, step: 1, unit: 'px', stage: IMG, def: 1 },
-    { id: 'resolution', label: 'Trace resolution', min: 200, max: 1200, step: 50, unit: 'px', stage: IMG, def: 600,
-      hint: 'Longest side of the traced image. Higher keeps small details and takes longer.' },
-    { id: 'speck', label: 'Ignore specks under', min: 0, max: 20, step: 1, unit: 'px', stage: TRACE, def: 4 },
-    { id: 'simplify', label: 'Path simplify', min: 0, max: 3, step: 0.1, unit: 'px', stage: TRACE, def: 0.8 },
-    { id: 'smooth', label: 'Curve smoothing passes', min: 0, max: 4, step: 1, stage: TRACE, def: 2 },
+// tab: where the control lives. 'main' controls use the compact one-line layout.
+const CONTROLS = [
+  // Main tab: the settings most people change
+  { id: 'size', tab: 'main', label: 'Longest side', min: 20, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 80, mode: 'image' },
+  { id: 'shapeW', tab: 'main', label: 'Width', min: 15, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 70, mode: 'shape' },
+  { id: 'shapeH', tab: 'main', label: 'Height', min: 15, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 50, mode: 'shape' },
+  { id: 'rounding', tab: 'main', label: 'Round corners', min: 0, max: 15, step: 0.1, unit: 'mm', stage: SHAPE, def: 0.8 },
+  { id: 'bladeHeight', tab: 'main', label: 'Total height', min: 6, max: 30, step: 0.5, unit: 'mm', stage: MESH, def: 12 },
+  { id: 'bladeThickness', tab: 'main', label: 'Tip thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 1.0 },
+  { id: 'lipThickness', tab: 'main', label: 'Lip thickness', min: 1, max: 5, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
+  { id: 'mirror', tab: 'main', label: 'Mirror for printing', type: 'check', stage: SHAPE, def: true },
+
+  // Image tab
+  { id: 'threshold', tab: 'image', label: 'Threshold', min: 1, max: 254, step: 1, stage: IMG, def: 128, auto: true,
+    hint: 'Pixels darker than this become the shape.' },
+  { id: 'invert', tab: 'image', label: 'Invert (light shape on dark background)', type: 'check', stage: IMG, def: false },
+  { id: 'contrast', tab: 'image', label: 'Contrast', min: -100, max: 100, step: 1, stage: IMG, def: 0 },
+  { id: 'brightness', tab: 'image', label: 'Brightness', min: -100, max: 100, step: 1, stage: IMG, def: 0 },
+  { id: 'blur', tab: 'image', label: 'Blur before threshold', min: 0, max: 6, step: 1, unit: 'px', stage: IMG, def: 1 },
+  { id: 'resolution', tab: 'image', label: 'Trace resolution', min: 200, max: 1200, step: 50, unit: 'px', stage: IMG, def: 600,
+    hint: 'Longest side of the traced image. Higher keeps small details and takes longer.' },
+  { id: 'speck', tab: 'image', label: 'Ignore specks under', min: 0, max: 20, step: 1, unit: 'px', stage: TRACE, def: 4 },
+  { id: 'simplify', tab: 'image', label: 'Path simplify', min: 0, max: 3, step: 0.1, unit: 'px', stage: TRACE, def: 0.8 },
+  { id: 'smooth', tab: 'image', label: 'Curve smoothing passes', min: 0, max: 4, step: 1, stage: TRACE, def: 2 },
+  { id: 'largestOnly', tab: 'image', label: 'Keep only the largest shape', type: 'check', stage: SHAPE, def: true },
+
+  // Shapes tab
+  { id: 'shapeSides', tab: 'shape', label: 'Number of sides', min: 4, max: 30, step: 1, stage: SHAPE, def: 6 },
+
+  // Advanced tab
+  { id: 'wallThickness', tab: 'advanced', group: 'Wall', label: 'Wall thickness', min: 0.8, max: 4, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
+  { id: 'wallHeight', tab: 'advanced', group: 'Wall', label: 'Thick wall height', min: 1, max: 25, step: 0.5, unit: 'mm', stage: MESH, def: 6,
+    hint: 'Measured from the bed. Above this the wall thins to the tip.' },
+  { id: 'taper', tab: 'advanced', group: 'Wall', label: 'Taper to tip over', min: 0, max: 8, step: 0.5, unit: 'mm', stage: MESH, def: 2,
+    hint: 'Stepped chamfer between wall and tip. 0 gives a single step.' },
+  { id: 'lipWidth', tab: 'advanced', group: 'Holding lip', label: 'Flange width (beyond wall)', min: 0, max: 12, step: 0.5, unit: 'mm', stage: MESH, def: 5,
+    hint: '0 removes the lip.' },
+  { id: 'detailEnabled', tab: 'advanced', group: 'Inner detail stamp', label: 'Add stamp lines for inner details', type: 'check', stage: SHAPE, def: true,
+    hint: 'Uses marks inside an uploaded drawing. Basic shapes have none.' },
+  { id: 'detailMode', tab: 'advanced', group: 'Inner detail stamp', label: 'Detail source', type: 'select', stage: SHAPE, def: 'auto', options: [
+    ['auto', 'Detect automatically'],
+    ['holes', 'Light marks inside a dark shape'],
+    ['lines', 'Dark lines inside an outline drawing'],
   ]},
-  { title: 'Shape', open: true, controls: [
-    { id: 'size', label: 'Cookie size (longest side)', min: 20, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 80 },
-    { id: 'rounding', label: 'Round off tight corners', min: 0, max: 5, step: 0.1, unit: 'mm', stage: SHAPE, def: 0.8,
-      hint: 'Removes notches and spikes narrower than about twice this radius.' },
-    { id: 'mirror', label: 'Mirror for printing', type: 'check', stage: SHAPE, def: true,
-      hint: 'The cutter prints blade-up and is flipped to use. Mirroring makes the cookie match your drawing.' },
-    { id: 'largestOnly', label: 'Keep only the largest shape', type: 'check', stage: SHAPE, def: true },
+  { id: 'stampMode', tab: 'advanced', group: 'Inner detail stamp', label: 'Stamp build', type: 'select', stage: MESH, def: 'integrated', options: [
+    ['integrated', 'One piece, with backing plate'],
+    ['separate', 'Separate press-in stamp'],
   ]},
-  { title: 'Blade (cutting edge)', open: true, controls: [
-    { id: 'bladeHeight', label: 'Total height', min: 6, max: 30, step: 0.5, unit: 'mm', stage: MESH, def: 12,
-      hint: 'From the print bed to the cutting tip. 10–15 mm suits most dough.' },
-    { id: 'bladeThickness', label: 'Tip thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 0.9 },
-  ]},
-  { title: 'Wall (body)', open: true, controls: [
-    { id: 'wallThickness', label: 'Wall thickness', min: 0.8, max: 4, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
-    { id: 'wallHeight', label: 'Thick wall height', min: 1, max: 25, step: 0.5, unit: 'mm', stage: MESH, def: 6,
-      hint: 'Measured from the bed. Above this the wall thins to the tip.' },
-    { id: 'taper', label: 'Taper to tip over', min: 0, max: 8, step: 0.5, unit: 'mm', stage: MESH, def: 2,
-      hint: 'Stepped chamfer between wall and tip. 0 gives a single step.' },
-  ]},
-  { title: 'Holding lip', open: true, controls: [
-    { id: 'lipWidth', label: 'Flange width (beyond wall)', min: 0, max: 12, step: 0.5, unit: 'mm', stage: MESH, def: 5 },
-    { id: 'lipThickness', label: 'Lip thickness', min: 1, max: 5, step: 0.1, unit: 'mm', stage: MESH, def: 2.4 },
-  ]},
-  { title: 'Inner detail stamp', open: true, controls: [
-    { id: 'detailEnabled', label: 'Add stamp lines for inner details', type: 'check', stage: SHAPE, def: true },
-    { id: 'detailMode', label: 'Detail source', type: 'select', stage: SHAPE, def: 'auto', options: [
-      ['auto', 'Detect automatically'],
-      ['holes', 'Light marks inside a dark shape'],
-      ['lines', 'Dark lines inside an outline drawing'],
-    ]},
-    { id: 'stampMode', label: 'Stamp build', type: 'select', stage: MESH, def: 'integrated', options: [
-      ['integrated', 'One piece, with backing plate'],
-      ['separate', 'Separate press-in stamp'],
-    ]},
-    { id: 'detailOffset', label: 'Height offset from blade', min: -8, max: 0, step: 0.5, unit: 'mm', stage: MESH, def: -3,
-      hint: 'Negative values keep the stamp lines shorter than the blade so they imprint without cutting.' },
-    { id: 'detailLine', label: 'Stamp line thickness', min: 0.6, max: 3, step: 0.1, unit: 'mm', stage: SHAPE, def: 1.2 },
-    { id: 'detailEdge', label: 'Keep clear of the edge', min: 0, max: 6, step: 0.5, unit: 'mm', stage: SHAPE, def: 1.5 },
-    { id: 'stampClearance', label: 'Stamp fit clearance', min: 0.2, max: 1.5, step: 0.05, unit: 'mm', stage: MESH, def: 0.5,
-      hint: 'Gap between a separate stamp and the cutter wall.' },
-  ]},
+  { id: 'detailOffset', tab: 'advanced', group: 'Inner detail stamp', label: 'Height offset from blade', min: -8, max: 0, step: 0.5, unit: 'mm', stage: MESH, def: -3,
+    hint: 'Negative values keep the stamp lines shorter than the blade so they imprint without cutting.' },
+  { id: 'detailLine', tab: 'advanced', group: 'Inner detail stamp', label: 'Stamp line thickness', min: 0.6, max: 3, step: 0.1, unit: 'mm', stage: SHAPE, def: 1.2 },
+  { id: 'detailEdge', tab: 'advanced', group: 'Inner detail stamp', label: 'Keep clear of the edge', min: 0, max: 6, step: 0.5, unit: 'mm', stage: SHAPE, def: 1.5 },
+  { id: 'stampClearance', tab: 'advanced', group: 'Inner detail stamp', label: 'Stamp fit clearance', min: 0.2, max: 1.5, step: 0.05, unit: 'mm', stage: MESH, def: 0.5,
+    hint: 'Gap between a separate stamp and the cutter wall.' },
 ];
-const CONTROLS = GROUPS.flatMap(g => g.controls);
-const DEFAULTS = Object.fromEntries(CONTROLS.map(c => [c.id, c.def]));
-const STORE_KEY = 'cookie-cutter-params-v1';
+const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle' };
+const STORE_KEY = 'cooki3d-params-v2';
 
 const params = { ...DEFAULTS };
 try { Object.assign(params, JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); } catch { /* storage unavailable */ }
@@ -88,34 +86,41 @@ function fmt(c, v) {
   return Number(v).toFixed(d);
 }
 
+function controlRow(c) {
+  const row = document.createElement('div');
+  const compact = c.tab === 'main';
+  row.className = 'row' + (c.type ? ' row-' + c.type : '') + (compact ? ' compact' : '');
+  row.dataset.id = c.id;
+  if (c.type === 'check') {
+    row.innerHTML = `<label class="check"><input type="checkbox" id="p-${c.id}"><span>${c.label}</span></label>`;
+  } else if (c.type === 'select') {
+    row.innerHTML = `<label for="p-${c.id}">${c.label}</label><select id="p-${c.id}">${c.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
+  } else {
+    const num = `<span class="num">${c.auto ? '<button type="button" class="mini" id="auto-threshold" title="Pick a threshold automatically">Auto</button>' : ''}<input type="number" inputmode="decimal" id="n-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" aria-label="${c.label} value">${c.unit ? `<i>${c.unit}</i>` : ''}</span>`;
+    const range = `<input type="range" id="p-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" aria-label="${c.label}">`;
+    row.innerHTML = compact
+      ? `<label for="n-${c.id}" id="l-${c.id}">${c.label}</label>${range}${num}`
+      : `<div class="row-head"><label for="p-${c.id}" id="l-${c.id}">${c.label}</label>${num}</div>${range}`;
+  }
+  if (c.hint && !compact) row.insertAdjacentHTML('beforeend', `<p class="hint">${c.hint}</p>`);
+  return row;
+}
+
 function buildControls() {
-  const root = $('#controls');
-  for (const g of GROUPS) {
-    const det = document.createElement('details');
-    det.className = 'group';
-    det.open = g.open;
-    det.innerHTML = `<summary>${g.title}</summary><div class="rows"></div>`;
-    const rows = det.querySelector('.rows');
-    for (const c of g.controls) {
-      const row = document.createElement('div');
-      row.className = 'row' + (c.type ? ' row-' + c.type : '');
-      row.dataset.id = c.id;
-      if (c.type === 'check') {
-        row.innerHTML = `<label class="check"><input type="checkbox" id="p-${c.id}"><span>${c.label}</span></label>`;
-      } else if (c.type === 'select') {
-        row.innerHTML = `<label for="p-${c.id}">${c.label}</label><select id="p-${c.id}">${c.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('')}</select>`;
-      } else {
-        row.innerHTML = `
-          <div class="row-head">
-            <label for="p-${c.id}">${c.label}</label>
-            <span class="num">${c.auto ? '<button type="button" class="mini" id="auto-threshold" title="Pick a threshold automatically (Otsu)">Auto</button>' : ''}<input type="number" id="n-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" aria-label="${c.label} value">${c.unit ? `<i>${c.unit}</i>` : ''}</span>
-          </div>
-          <input type="range" id="p-${c.id}" min="${c.min}" max="${c.max}" step="${c.step}">`;
+  const groups = new Map();
+  for (const c of CONTROLS) {
+    let host = $('#controls-' + c.tab);
+    if (c.group) {
+      if (!groups.has(c.group)) {
+        const sec = document.createElement('section');
+        sec.className = 'adv-group';
+        sec.innerHTML = `<h3>${c.group}</h3><div class="rows"></div>`;
+        host.appendChild(sec);
+        groups.set(c.group, sec.querySelector('.rows'));
       }
-      if (c.hint) row.insertAdjacentHTML('beforeend', `<p class="hint">${c.hint}</p>`);
-      rows.appendChild(row);
+      host = groups.get(c.group);
     }
-    root.appendChild(det);
+    host.appendChild(controlRow(c));
   }
   for (const c of CONTROLS) {
     const el = $('#p-' + c.id), num = $('#n-' + c.id);
@@ -135,6 +140,7 @@ function buildControls() {
         el.value = v;
         onChange(v);
       });
+      num.addEventListener('focus', () => num.select());
     }
   }
   $('#auto-threshold').addEventListener('click', () => {
@@ -158,11 +164,31 @@ function syncControls() {
   updateVisibility();
 }
 
+function setLimits(id, min, max, label) {
+  const el = $('#p-' + id), num = $('#n-' + id);
+  el.min = num.min = min; el.max = num.max = max;
+  if (label) $('#l-' + id).textContent = label;
+  const c = CONTROLS.find(x => x.id === id);
+  c.min = min; c.max = max;
+  if (params[id] < min || params[id] > max) setParam(id, Math.min(max, Math.max(min, params[id])));
+}
+
 function updateVisibility() {
+  const shapeMode = params.source === 'shape';
+  const s = shapeById(params.shapeType);
+  const row = id => document.querySelector(`.row[data-id="${id}"]`);
+  row('size').hidden = shapeMode;
+  row('shapeW').hidden = !shapeMode;
+  row('shapeH').hidden = !shapeMode || s.dims === 'd';
+  $('#l-shapeW').textContent = s.dims === 'd' ? (s.id === 'square' ? 'Side length' : 'Diameter') : 'Width';
+  row('shapeSides').hidden = !s.sides;
+  if (s.sides) setLimits('shapeSides', s.sides.min, s.sides.max, s.sides.label);
   const on = params.detailEnabled;
-  for (const id of ['detailMode', 'stampMode', 'detailOffset', 'detailLine', 'detailEdge'])
-    document.querySelector(`.row[data-id="${id}"]`).hidden = !on;
-  document.querySelector('.row[data-id="stampClearance"]').hidden = !(on && params.stampMode === 'separate');
+  for (const id of ['detailMode', 'stampMode', 'detailOffset', 'detailLine', 'detailEdge']) row(id).hidden = !on;
+  row('stampClearance').hidden = !(on && params.stampMode === 'separate');
+  document.querySelectorAll('.shape-btn').forEach(b => b.setAttribute('aria-pressed', String(shapeMode && b.dataset.id === params.shapeType)));
+  document.querySelectorAll('.sample').forEach(b => b.setAttribute('aria-pressed', String(!shapeMode && b.dataset.id === state.name)));
+  $('#source-label').textContent = shapeMode ? `${s.name}` : (state.name === 'cookie' ? 'Your image' : state.name);
 }
 
 function schedule(stage) {
@@ -172,6 +198,69 @@ function schedule(stage) {
   setBusy(true);
   clearTimeout(timer);
   timer = setTimeout(run, stage <= TRACE ? 120 : 60);
+}
+
+// ---------- Tabs ----------
+
+function initTabs() {
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  const select = t => {
+    for (const x of tabs) {
+      const on = x === t;
+      x.setAttribute('aria-selected', String(on));
+      x.tabIndex = on ? 0 : -1;
+      $('#' + x.getAttribute('aria-controls')).hidden = !on;
+    }
+    try { localStorage.setItem('cooki3d-tab', t.id); } catch { /* ignore */ }
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => select(t));
+    t.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return;
+      const n = tabs[(i + d + tabs.length) % tabs.length];
+      select(n); n.focus();
+    });
+  });
+  document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => $('#' + b.dataset.goto).click()));
+  select(tabs[0]);
+}
+
+// ---------- Basic shapes ----------
+
+/** Build a basic shape whose finished (corner-rounded) outline measures exactly w × h. */
+function buildShape(s, w, h) {
+  let gw = w, gh = h, shape = null;
+  for (let i = 0; i < 3; i++) {
+    const loop = shapeLoop(s.id, gw, gh, params.shapeSides);
+    shape = analyzeShape([loop], { ...params, size: Math.max(gw, gh), detailEnabled: false, largestOnly: true });
+    if (!shape) return null;
+    const b = shape.bounds, aw = b.maxX - b.minX, ah = b.maxY - b.minY;
+    if (Math.abs(aw - w) < 0.05 && Math.abs(ah - h) < 0.05) break;
+    gw *= w / aw; gh *= h / ah; // corner rounding trims pointed tips: grow and retry
+  }
+  return shape;
+}
+
+function initShapes() {
+  const grid = $('#shape-grid');
+  for (const s of SHAPES) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'shape-btn'; b.dataset.id = s.id;
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${shapeIcon(s)}"/></svg><span>${s.name}</span>`;
+    b.addEventListener('click', () => selectShape(s));
+    grid.appendChild(b);
+  }
+}
+
+function selectShape(s) {
+  if (params.shapeType !== s.id && s.sides) params.shapeSides = s.sides.def;
+  params.shapeType = s.id;
+  params.source = 'shape';
+  state.fit = true;
+  if (s.sides) setParam('shapeSides', params.shapeSides);
+  schedule(SHAPE);
 }
 
 // ---------- Image input ----------
@@ -201,14 +290,13 @@ function setSource(img, autoTune) {
   state.source = img;
   state.autoTune = autoTune;
   state.fit = true;
-  document.querySelectorAll('.sample').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  params.source = 'image';
   schedule(IMG);
 }
 
 function loadSample(s) {
   state.name = s.id;
   setSource(s.make(), true);
-  document.querySelector(`.sample[data-id="${s.id}"]`)?.setAttribute('aria-pressed', 'true');
 }
 
 // ---------- Pipeline ----------
@@ -253,22 +341,31 @@ function isDarkBackground(gray, w, h, t) {
 }
 
 function run() {
-  if (!state.source) return;
+  const shapeMode = params.source === 'shape';
+  if (!shapeMode && !state.source) return;
   const t0 = performance.now();
   try {
-    if (dirty <= IMG) processImage();
-    if (dirty <= TRACE) state.loops = maskToLoops(state.mask, state.w, state.h, params);
-    if (dirty <= SHAPE) state.shape = state.loops.length ? analyzeShape(state.loops, params) : null;
+    if (shapeMode) {
+      if (dirty <= SHAPE) {
+        const s = shapeById(params.shapeType);
+        const w = params.shapeW, h = s.dims === 'd' ? params.shapeW : params.shapeH;
+        state.shape = buildShape(s, w, h);
+      }
+    } else {
+      if (dirty <= IMG) processImage();
+      if (dirty <= TRACE) state.loops = maskToLoops(state.mask, state.w, state.h, params);
+      if (dirty <= SHAPE) state.shape = state.loops.length ? analyzeShape(state.loops, params) : null;
+    }
     if (dirty <= MESH) {
       state.parts = state.shape && state.shape.outline.length ? buildCutter(state.shape, params) : null;
       updateScene();
     }
     draw2D();
-    updateStats(performance.now() - t0);
+    updateStats();
     hideError();
   } catch (err) {
     console.error(err);
-    showError('Could not build the cutter from this image. Try raising the threshold, adding blur, or rounding corners.');
+    showError(shapeMode ? 'Could not build this shape. Try a smaller corner rounding or larger dimensions.' : 'Could not build the cutter from this image. Try raising the threshold, adding blur, or rounding corners.');
   }
   dirty = MESH + 1;
   setBusy(false);
@@ -285,6 +382,25 @@ function draw2D() {
   const css = getComputedStyle(document.documentElement);
   g.fillStyle = css.getPropertyValue('--trace-bg').trim();
   g.fillRect(0, 0, cv.width, cv.height);
+  const shape = state.shape;
+  if (params.source === 'shape') {
+    if (!shape) return;
+    const b = shape.bounds;
+    const s = Math.min(cv.width / (b.maxX - b.minX), cv.height / (b.maxY - b.minY)) * 0.8;
+    const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+    const sx = shape.xf.sx;
+    const p = new Path2D();
+    for (const path of shape.outline) {
+      path.forEach((q, i) => (i ? p.lineTo : p.moveTo).call(p, cv.width / 2 + sx * (q.X / 1000 - cx) * s, cv.height / 2 - (q.Y / 1000 - cy) * s));
+      p.closePath();
+    }
+    g.fillStyle = css.getPropertyValue('--trace-ink').trim();
+    g.fill(p);
+    g.lineWidth = 2 * dpr;
+    g.strokeStyle = css.getPropertyValue('--accent').trim();
+    g.stroke(p);
+    return;
+  }
   if (!state.mask) return;
   const { w, h, mask } = state;
   const s = Math.min(cv.width / w, cv.height / h) * 0.94;
@@ -302,7 +418,6 @@ function draw2D() {
   mg.putImageData(id, 0, 0);
   g.imageSmoothingEnabled = false;
   g.drawImage(mc, ox, oy, w * s, h * s);
-  const shape = state.shape;
   if (!shape) return;
   const { k, cx, cy, sx } = shape.xf;
   const tx = x => ox + ((sx * x) / k + cx) * s, ty = y => oy + (-(y / k + cy)) * s;
@@ -365,7 +480,7 @@ function resize() {
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  if (state.mask) draw2D();
+  if (state.shape) draw2D();
 }
 
 function setGrid(size) {
@@ -416,39 +531,35 @@ function volume(g) {
   return v;
 }
 
-function updateStats(ms) {
-  const out = $('#stats'), warn = $('#warnings');
+function updateStats() {
+  const out = $('#stats'), warn = $('#warnings'), notes = $('#notes');
   const parts = state.parts, shape = state.shape;
-  warn.innerHTML = '';
   const W = [];
+  $('#export-btn').disabled = !parts;
   if (!parts) {
-    out.innerHTML = `<div class="stat"><b>No shape found</b><span>Adjust the threshold or try Invert.</span></div>`;
-    $('#export').hidden = true;
+    out.textContent = params.source === 'shape' ? 'No shape' : 'No shape found. Adjust the threshold or try Invert (Image tab).';
+    warn.innerHTML = notes.innerHTML = '';
     return;
   }
-  $('#export').hidden = false;
   const bb = parts.cutter.boundingBox;
   const vol = volume(parts.cutter) + (parts.stamp ? volume(parts.stamp) : 0);
-  const tris = (parts.cutter.attributes.position.count + (parts.stamp?.attributes.position.count ?? 0)) / 3;
   const grams = (vol / 1000) * 1.24;
-  const cell = (label, value) => `<div class="stat"><span>${label}</span><b>${value}</b></div>`;
-  out.innerHTML =
-    cell('Footprint', `${(bb.max.x - bb.min.x).toFixed(1)} × ${(bb.max.y - bb.min.y).toFixed(1)} mm`) +
-    cell('Height', `${(bb.max.z).toFixed(1)} mm`) +
-    cell('Filament', `≈ ${grams.toFixed(0)} g PLA`) +
-    `<div class="stat stat-tris"><span>Triangles</span><b>${tris.toLocaleString()}</b></div>`;
-  $('#timing').textContent = `Built in ${Math.round(ms)} ms`;
+  const cookie = shape.bounds;
+  out.innerHTML = `<b>${(cookie.maxX - cookie.minX).toFixed(0)} × ${(cookie.maxY - cookie.minY).toFixed(0)} mm</b> cookie · ` +
+    `<span class="print">${(bb.max.x - bb.min.x).toFixed(0)} × ${(bb.max.y - bb.min.y).toFixed(0)} × ${bb.max.z.toFixed(0)} mm print · </span>≈ ${grams.toFixed(0)} g`;
+  out.title = `Print size ${(bb.max.x - bb.min.x).toFixed(1)} × ${(bb.max.y - bb.min.y).toFixed(1)} × ${bb.max.z.toFixed(1)} mm`;
 
-  if (params.bladeThickness < 0.8) W.push(['warn', 'Tip is under 0.8 mm, thinner than two lines from a 0.4 mm nozzle. Some slicers will drop it.']);
-  if (Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) > 220) W.push(['warn', 'Longer than 220 mm. Check that it fits your printer bed.']);
+  if (params.bladeThickness < 0.8) W.push(['warn', 'Tip under 0.8 mm may not print with a 0.4 mm nozzle.']);
+  if (Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) > 220) W.push(['warn', 'Over 220 mm. Check that it fits your printer bed.']);
   const narrow = area(offset(offset(shape.outline, -1.6), 1.6)) < area(shape.outline) * 0.985;
-  if (narrow) W.push(['warn', 'Some parts of the outline are narrower than about 3 mm. Dough will tear or stick there. Raise “Round off tight corners” or simplify the drawing.']);
+  if (narrow) W.push(['warn', 'Some parts are narrower than 3 mm. Raise “Round corners” to smooth them.']);
+  const N = [];
   const { wallTop } = wallProfile(params);
-  if (params.wallHeight > params.bladeHeight - 0.5) W.push(['info', `Thick wall is capped at ${wallTop.toFixed(1)} mm so a thinner tip remains.`]);
-  if (params.detailEnabled && !shape.details.length) W.push(['info', 'No inner details found, so no stamp lines were added. Try switching the detail source.']);
-  if (params.detailEnabled && shape.details.length) W.push(['info', `Stamp lines from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${Math.abs(params.detailOffset)} mm below the blade.`]);
+  if (params.wallHeight > params.bladeHeight - 0.5) N.push(`Thick wall is capped at ${wallTop.toFixed(1)} mm so a thinner tip remains.`);
+  if (params.source === 'image' && params.detailEnabled && !shape.details.length) N.push('No inner details found, so no stamp lines were added. Try switching the detail source.');
+  if (params.source === 'image' && params.detailEnabled && shape.details.length) N.push(`Stamp lines come from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${Math.abs(params.detailOffset)} mm below the blade.`);
   warn.innerHTML = W.map(([k, t]) => `<li class="${k}">${t}</li>`).join('');
-  $('#dl-cutter').hidden = $('#dl-stamp').hidden = !parts.stamp;
+  notes.innerHTML = N.map(t => `<li class="info">${t}</li>`).join('');
 }
 
 function stlBytes(geometries) {
@@ -501,16 +612,39 @@ async function save(filename, bytes) {
 }
 
 function exportName(suffix) {
-  return `${state.name}-${suffix}-${Math.round(params.size)}mm.stl`;
+  if (params.source === 'shape') {
+    const sh = shapeById(params.shapeType);
+    const dims = sh.dims === 'd' ? `${Math.round(params.shapeW)}mm` : `${Math.round(params.shapeW)}x${Math.round(params.shapeH)}mm`;
+    return `cooki3d-${sh.id}-${dims}.stl`;
+  }
+  return `cooki3d-${state.name}-${suffix}-${Math.round(params.size)}mm.stl`;
 }
 
 function initExport() {
-  $('#dl-all').addEventListener('click', () => {
+  const btn = $('#export-btn'), menu = $('#export-menu');
+  const all = () => {
     const p = state.parts; if (!p) return;
     save(exportName(p.stamp ? 'cutter-and-stamp' : 'cutter'), stlBytes(p.stamp ? [p.cutter, p.stamp] : [p.cutter]));
+  };
+  btn.addEventListener('click', e => {
+    if (!state.parts) return;
+    if (!state.parts.stamp) { all(); return; } // one part: export straight away
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', String(!menu.hidden));
   });
-  $('#dl-cutter').addEventListener('click', () => state.parts && save(exportName('cutter'), stlBytes([state.parts.cutter])));
-  $('#dl-stamp').addEventListener('click', () => state.parts?.stamp && save(exportName('stamp'), stlBytes([state.parts.stamp])));
+  menu.addEventListener('click', e => {
+    const which = e.target.closest('button')?.dataset.part;
+    if (!which) return;
+    menu.hidden = true; btn.setAttribute('aria-expanded', 'false');
+    const p = state.parts;
+    if (which === 'all') all();
+    if (which === 'cutter') save(exportName('cutter'), stlBytes([p.cutter]));
+    if (which === 'stamp' && p.stamp) save(exportName('stamp'), stlBytes([p.stamp]));
+  });
+  document.addEventListener('click', e => {
+    if (!menu.hidden && !menu.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  });
 }
 
 // ---------- UI helpers ----------
@@ -526,7 +660,8 @@ function toast(t) {
 
 function initInput() {
   const file = $('#file');
-  file.addEventListener('change', () => loadFile(file.files[0]));
+  file.addEventListener('change', () => { loadFile(file.files[0]); file.value = ''; });
+  $('#open-image').addEventListener('click', () => file.click());
   const drop = document.body;
   drop.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('dragging'); });
   drop.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dragging'); });
@@ -547,7 +682,8 @@ function initInput() {
     list.appendChild(b);
   }
   $('#reset').addEventListener('click', () => {
-    Object.assign(params, DEFAULTS);
+    const keep = { source: params.source, shapeType: params.shapeType };
+    Object.assign(params, DEFAULTS, keep);
     syncControls();
     state.autoTune = true;
     schedule(IMG);
@@ -562,8 +698,11 @@ function initInput() {
 }
 
 buildControls();
+initTabs();
+initShapes();
 initViewer();
 initInput();
 initExport();
 initPWA({ onFile: loadFile });
-loadSample(SAMPLES[0]);
+if (params.source === 'shape') { state.fit = true; schedule(SHAPE); }
+else loadSample(SAMPLES[0]);

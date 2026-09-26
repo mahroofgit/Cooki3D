@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cookie Cutter Forge</title>
+<title>Cooki3D</title>
 <meta name="description" content="Turn a drawing or silhouette into a print-ready 3D cookie cutter STL, entirely in your browser.">
 <meta name="theme-color" content="#f7f9fa" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#161b20" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Cutter Forge">
+<meta name="apple-mobile-web-app-title" content="Cooki3D">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3l3.6 7.6 8.4 1-6.2 5.7 1.7 8.3L16 21.4 8.5 25.6l1.7-8.3L4 11.6l8.4-1z' fill='none' stroke='%23e8672a' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
@@ -33,68 +33,91 @@
   <header class="bar">
     <div class="brand">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l3.6 7.6 8.4 1-6.2 5.7 1.7 8.3L16 21.4 8.5 25.6l1.7-8.3L4 11.6l8.4-1z"/></svg>
-      <h1>Cookie Cutter Forge</h1>
+      <h1>Cooki<span>3D</span></h1>
     </div>
-    <p class="tag">Drawing in, printable STL out. Nothing leaves your browser.</p>
-    <button type="button" class="mini install" id="install" hidden>Install app</button>
+    <div class="bar-actions">
+      <button type="button" class="mini icon-btn" id="open-image" title="Open an image">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>
+        <span>Image</span>
+      </button>
+      <button type="button" class="mini" id="install" hidden>Install app</button>
+    </div>
     <div id="install-help" class="install-help" role="dialog" aria-label="Install on iPhone or iPad" hidden>
       <p><b>Add to your Home Screen</b></p>
       <ol>
         <li>Tap the <b>Share</b> button in Safari's toolbar.</li>
         <li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
-        <li>Open Cutter Forge from its icon. It runs full-screen and works offline.</li>
+        <li>Open Cooki3D from its icon. It runs full-screen and works offline.</li>
       </ol>
       <button type="button" class="mini">Got it</button>
     </div>
   </header>
 
-  <aside class="panel" aria-label="Settings">
-    <section class="source">
-      <h2>1 · Your drawing</h2>
-      <label class="upload" for="file">
-        <input type="file" id="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,.svg">
-        <span class="upload-main">Choose an image</span>
-        <span class="upload-sub">PNG, JPG or SVG. You can also drop or paste one anywhere.</span>
-      </label>
-      <div class="samples">
-        <span>Or try</span>
-        <div id="samples" class="chips"></div>
-      </div>
-    </section>
-    <section>
-      <div class="section-head">
-        <h2>2 · Dimensions</h2>
-        <button type="button" class="mini" id="reset">Reset</button>
-      </div>
-      <div id="controls"></div>
-    </section>
-  </aside>
-
   <main class="stage">
-    <div id="viewport" class="viewport" aria-label="3D preview. Drag to orbit, scroll to zoom."></div>
+    <div id="viewport" class="viewport" aria-label="3D preview. Drag to orbit, pinch or scroll to zoom."></div>
     <figure class="trace-card">
-      <canvas id="trace" aria-label="Traced outline preview"></canvas>
-      <figcaption><i class="key k-cut"></i>Cutting edge <i class="key k-stamp"></i>Stamp lines</figcaption>
+      <canvas id="trace" aria-label="Outline preview"></canvas>
+      <figcaption id="source-label"></figcaption>
     </figure>
     <div class="view-tools">
       <button type="button" class="mini" id="view-fit">Fit</button>
       <button type="button" class="mini" id="view-top">Top</button>
+    </div>
+    <p id="stats" class="stats" aria-live="polite"></p>
+    <div class="export-wrap">
+      <div id="export-menu" class="export-menu" role="menu" hidden>
+        <button type="button" role="menuitem" data-part="all">Cutter + stamp</button>
+        <button type="button" role="menuitem" data-part="cutter">Cutter only</button>
+        <button type="button" role="menuitem" data-part="stamp">Stamp only</button>
+      </div>
+      <button type="button" id="export-btn" class="fab" title="Export STL" aria-label="Export STL" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+      </button>
     </div>
     <div id="busy" class="busy" hidden>Building…</div>
     <p id="error" class="error" role="alert" hidden></p>
     <div class="drop-hint">Drop the image to trace it</div>
   </main>
 
-  <section class="output" aria-label="Result">
-    <div id="stats" class="stats"></div>
-    <ul id="warnings" class="warnings"></ul>
-    <div id="export" class="export">
-      <button type="button" class="primary" id="dl-all">Download STL</button>
-      <button type="button" id="dl-cutter" hidden>Cutter only</button>
-      <button type="button" id="dl-stamp" hidden>Stamp only</button>
-      <span id="timing" class="timing"></span>
+  <aside class="panel" aria-label="Settings">
+    <nav class="tabs" role="tablist" aria-label="Settings">
+      <button type="button" role="tab" id="t-main" aria-controls="tab-main">Cutter</button>
+      <button type="button" role="tab" id="t-image" aria-controls="tab-image">Image</button>
+      <button type="button" role="tab" id="t-shape" aria-controls="tab-shape">Shapes</button>
+      <button type="button" role="tab" id="t-adv" aria-controls="tab-advanced">Advanced</button>
+    </nav>
+
+    <div id="tab-main" class="tabpanel" role="tabpanel" aria-labelledby="t-main">
+      <div id="controls-main" class="quick"></div>
+      <ul id="warnings" class="warnings"></ul>
     </div>
-  </section>
+
+    <div id="tab-image" class="tabpanel" role="tabpanel" aria-labelledby="t-image" hidden>
+      <label class="upload" for="file">
+        <input type="file" id="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,.svg">
+        <span class="upload-main">Choose an image</span>
+        <span class="upload-sub">PNG, JPG or SVG, or a photo of a drawing. You can also drop or paste one.</span>
+      </label>
+      <div class="samples">
+        <span>Examples</span>
+        <div id="samples" class="chips"></div>
+      </div>
+      <h3>Image cleanup</h3>
+      <div id="controls-image" class="rows"></div>
+    </div>
+
+    <div id="tab-shape" class="tabpanel" role="tabpanel" aria-labelledby="t-shape" hidden>
+      <div id="shape-grid" class="shape-grid"></div>
+      <div id="controls-shape" class="rows"></div>
+      <p class="hint">Set the width, height and corner rounding on the <button type="button" class="linkish" data-goto="t-main">Cutter</button> tab.</p>
+    </div>
+
+    <div id="tab-advanced" class="tabpanel" role="tabpanel" aria-labelledby="t-adv" hidden>
+      <ul id="notes" class="warnings"></ul>
+      <div id="controls-advanced"></div>
+      <button type="button" class="mini reset" id="reset">Reset all settings</button>
+    </div>
+  </aside>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 <!-- APP:END -->
