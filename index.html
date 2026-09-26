@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cookie Cutter Forge</title>
+<meta name="description" content="Turn a drawing or silhouette into a print-ready 3D cookie cutter STL, entirely in your browser.">
+<meta name="theme-color" content="#f7f9fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161b20" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cutter Forge">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3l3.6 7.6 8.4 1-6.2 5.7 1.7 8.3L16 21.4 8.5 25.6l1.7-8.3L4 11.6l8.4-1z' fill='none' stroke='%23e8672a' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script src="lib/clipper.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "./lib/three/three.module.js",
+  "three/addons/": "./lib/three/addons/"
+} }
+</script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<!-- APP:START -->
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l3.6 7.6 8.4 1-6.2 5.7 1.7 8.3L16 21.4 8.5 25.6l1.7-8.3L4 11.6l8.4-1z"/></svg>
+      <h1>Cookie Cutter Forge</h1>
+    </div>
+    <p class="tag">Drawing in, printable STL out. Nothing leaves your browser.</p>
+    <button type="button" class="mini install" id="install" hidden>Install app</button>
+    <div id="install-help" class="install-help" role="dialog" aria-label="Install on iPhone or iPad" hidden>
+      <p><b>Add to your Home Screen</b></p>
+      <ol>
+        <li>Tap the <b>Share</b> button in Safari's toolbar.</li>
+        <li>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+        <li>Open Cutter Forge from its icon. It runs full-screen and works offline.</li>
+      </ol>
+      <button type="button" class="mini">Got it</button>
+    </div>
+  </header>
+
+  <aside class="panel" aria-label="Settings">
+    <section class="source">
+      <h2>1 · Your drawing</h2>
+      <label class="upload" for="file">
+        <input type="file" id="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,.svg">
+        <span class="upload-main">Choose an image</span>
+        <span class="upload-sub">PNG, JPG or SVG. You can also drop or paste one anywhere.</span>
+      </label>
+      <div class="samples">
+        <span>Or try</span>
+        <div id="samples" class="chips"></div>
+      </div>
+    </section>
+    <section>
+      <div class="section-head">
+        <h2>2 · Dimensions</h2>
+        <button type="button" class="mini" id="reset">Reset</button>
+      </div>
+      <div id="controls"></div>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div id="viewport" class="viewport" aria-label="3D preview. Drag to orbit, scroll to zoom."></div>
+    <figure class="trace-card">
+      <canvas id="trace" aria-label="Traced outline preview"></canvas>
+      <figcaption><i class="key k-cut"></i>Cutting edge <i class="key k-stamp"></i>Stamp lines</figcaption>
+    </figure>
+    <div class="view-tools">
+      <button type="button" class="mini" id="view-fit">Fit</button>
+      <button type="button" class="mini" id="view-top">Top</button>
+    </div>
+    <div id="busy" class="busy" hidden>Building…</div>
+    <p id="error" class="error" role="alert" hidden></p>
+    <div class="drop-hint">Drop the image to trace it</div>
+  </main>
+
+  <section class="output" aria-label="Result">
+    <div id="stats" class="stats"></div>
+    <ul id="warnings" class="warnings"></ul>
+    <div id="export" class="export">
+      <button type="button" class="primary" id="dl-all">Download STL</button>
+      <button type="button" id="dl-cutter" hidden>Cutter only</button>
+      <button type="button" id="dl-stamp" hidden>Stamp only</button>
+      <span id="timing" class="timing"></span>
+    </div>
+  </section>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+<!-- APP:END -->
+</body>
+</html>
