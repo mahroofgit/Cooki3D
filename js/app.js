@@ -22,7 +22,7 @@ const CONTROLS = [
   // Blade height is measured from the top of the flange; the flange thickness is added underneath.
   { id: 'bladeHeight', tab: 'main', label: 'Blade height', min: 10, max: 40, step: 0.5, unit: 'mm', stage: MESH, def: 20 },
   { id: 'bladeThickness', tab: 'main', label: 'Blade thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 1.0 },
-  { id: 'lipWidth', tab: 'main', label: 'Flange width', min: 0, max: 20, step: 0.5, unit: 'mm', stage: MESH, def: 11 },
+  { id: 'lipWidth', tab: 'main', label: 'Flange width', min: 0, max: 20, step: 0.5, unit: 'mm', stage: MESH, def: 10 },
   { id: 'lipThickness', tab: 'main', label: 'Flange thickness', min: 1.8, max: 6, step: 0.1, unit: 'mm', stage: MESH, def: 2.8 },
   { id: 'mirror', tab: 'main', label: 'Mirror for printing', type: 'check', stage: SHAPE, def: true },
 
@@ -69,17 +69,22 @@ const CONTROLS = [
     hint: 'Gap between a separate stamp and the cutter wall.' },
 ];
 const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle', units: 'mm' };
-const STORE_KEY = 'cooki3d-params-v4';
+const STORE_KEY = 'cooki3d-params-v5';
 
 const params = { ...DEFAULTS };
 try {
   const saved = localStorage.getItem(STORE_KEY);
+  const v4 = localStorage.getItem('cooki3d-params-v4');
   if (saved) Object.assign(params, JSON.parse(saved));
-  else {
+  else if (v4) {
+    // Previous version: keep everything, but move the old 11 mm flange default to the new 10 mm.
+    const old = JSON.parse(v4);
+    Object.assign(params, old, old.lipWidth === 11 ? { lipWidth: 10 } : {});
+  } else {
     // Keep settings from the previous version, but apply the new blade and flange defaults once
     // (blade height now excludes the flange, so the old value can't carry over).
     const old = JSON.parse(localStorage.getItem('cooki3d-params-v3') || '{}');
-    Object.assign(params, old, { bladeHeight: 20, bladeThickness: 1.0, lipThickness: 2.8, lipWidth: 11 });
+    Object.assign(params, old, { bladeHeight: 20, bladeThickness: 1.0, lipThickness: 2.8, lipWidth: 10 });
   }
 } catch { /* storage unavailable */ }
 
