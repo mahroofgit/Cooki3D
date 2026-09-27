@@ -150,7 +150,7 @@ html.standalone, html.standalone body { overscroll-behavior: none; }
 /* Main tab: one line per setting */
 .quick { display: flex; flex-direction: column; }
 .row.compact {
-  display: grid; grid-template-columns: 7.2em 1fr auto; align-items: center; gap: 10px;
+  display: grid; grid-template-columns: 8.2em 1fr auto; align-items: center; gap: 10px;
   min-height: 42px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
@@ -294,7 +294,7 @@ body.dragging .drop-hint { display: grid; }
   .icon-btn span { display: none; }
   .tabs { padding-inline: 6px; }
   .tabpanel { padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px)); gap: 10px; }
-  .row.compact { min-height: 40px; grid-template-columns: 7.4em 1fr auto; gap: 8px; }
+  .row.compact { min-height: 40px; grid-template-columns: 8.1em 1fr auto; gap: 8px; }
   .stats .print { display: none; }
   /* 16px stops iOS zooming into fields on focus */
   .num input, select { font-size: 16px; }

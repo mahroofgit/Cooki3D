@@ -1,6 +1,6 @@
 // Offline support: the whole app is cached on first visit.
 // Bump VERSION whenever you change any file so phones pick up the update.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE = `cutter-forge-${VERSION}`;
 const APP_SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',

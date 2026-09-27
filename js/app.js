@@ -19,10 +19,11 @@ const CONTROLS = [
   { id: 'shapeW', tab: 'main', label: 'Width', min: 15, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 70, mode: 'shape' },
   { id: 'shapeH', tab: 'main', label: 'Height', min: 15, max: 250, step: 1, unit: 'mm', stage: SHAPE, def: 50, mode: 'shape' },
   { id: 'rounding', tab: 'main', label: 'Round corners', min: 0, max: 15, step: 0.1, unit: 'mm', stage: SHAPE, def: 0.8 },
-  { id: 'bladeHeight', tab: 'main', label: 'Total height', min: 6, max: 30, step: 0.5, unit: 'mm', stage: MESH, def: 12 },
-  { id: 'bladeThickness', tab: 'main', label: 'Tip thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 1.0 },
-  { id: 'lipThickness', tab: 'main', label: 'Lip thickness', min: 1, max: 5, step: 0.1, unit: 'mm', stage: MESH, def: 2.0 },
-  { id: 'lipWidth', tab: 'main', label: 'Flange width', min: 0, max: 20, step: 0.5, unit: 'mm', stage: MESH, def: 10 },
+  // Blade height is measured from the top of the flange; the flange thickness is added underneath.
+  { id: 'bladeHeight', tab: 'main', label: 'Blade height', min: 10, max: 40, step: 0.5, unit: 'mm', stage: MESH, def: 20 },
+  { id: 'bladeThickness', tab: 'main', label: 'Blade thickness', min: 0.4, max: 2, step: 0.05, unit: 'mm', stage: MESH, def: 1.0 },
+  { id: 'lipWidth', tab: 'main', label: 'Flange width', min: 0, max: 20, step: 0.5, unit: 'mm', stage: MESH, def: 11 },
+  { id: 'lipThickness', tab: 'main', label: 'Flange thickness', min: 1.8, max: 6, step: 0.1, unit: 'mm', stage: MESH, def: 2.8 },
   { id: 'mirror', tab: 'main', label: 'Mirror for printing', type: 'check', stage: SHAPE, def: true },
 
   // Image tab
@@ -68,18 +69,24 @@ const CONTROLS = [
     hint: 'Gap between a separate stamp and the cutter wall.' },
 ];
 const DEFAULTS = { ...Object.fromEntries(CONTROLS.map(c => [c.id, c.def])), source: 'image', shapeType: 'circle', units: 'mm' };
-const STORE_KEY = 'cooki3d-params-v3';
+const STORE_KEY = 'cooki3d-params-v4';
 
 const params = { ...DEFAULTS };
 try {
   const saved = localStorage.getItem(STORE_KEY);
   if (saved) Object.assign(params, JSON.parse(saved));
   else {
-    // Keep settings from the previous version, but apply the new wall and flange defaults once.
-    const old = JSON.parse(localStorage.getItem('cooki3d-params-v2') || '{}');
-    Object.assign(params, old, { wallThickness: 0, wallHeight: 0, taper: 0, lipWidth: 10 });
+    // Keep settings from the previous version, but apply the new blade and flange defaults once
+    // (blade height now excludes the flange, so the old value can't carry over).
+    const old = JSON.parse(localStorage.getItem('cooki3d-params-v3') || '{}');
+    Object.assign(params, old, { bladeHeight: 20, bladeThickness: 1.0, lipThickness: 2.8, lipWidth: 11 });
   }
 } catch { /* storage unavailable */ }
+
+/** Flange thickness (when there is a flange) + blade height above it. */
+const totalHeight = () => params.bladeHeight + (params.lipWidth > 0 ? params.lipThickness : 0);
+/** Parameters for the geometry code, which measures height from the print bed. */
+const geoParams = () => ({ ...params, bladeHeight: totalHeight() });
 
 const $ = s => document.querySelector(s);
 const state = { source: null, name: 'cookie', gray: null, mask: null, w: 0, h: 0, loops: null, shape: null, parts: null };
@@ -415,7 +422,7 @@ function run() {
       if (dirty <= SHAPE) state.shape = state.loops.length ? analyzeShape(state.loops, params) : null;
     }
     if (dirty <= MESH) {
-      state.parts = state.shape && state.shape.outline.length ? buildCutter(state.shape, params) : null;
+      state.parts = state.shape && state.shape.outline.length ? buildCutter(state.shape, geoParams()) : null;
       updateScene();
     }
     draw2D();
@@ -618,8 +625,8 @@ function updateStats() {
   const narrow = area(offset(offset(shape.outline, -1.6), 1.6)) < area(shape.outline) * 0.985;
   if (narrow) W.push(['warn', `Some parts are narrower than ${L(3)}. Raise “Round corners” to smooth them.`]);
   const N = [];
-  const { wallTop } = wallProfile(params);
-  if (params.wallHeight > params.bladeHeight - 0.5) N.push(`Thick wall is capped at ${L(wallTop, 1)} so a thinner tip remains.`);
+  const { wallTop } = wallProfile(geoParams());
+  if (params.wallHeight > totalHeight() - 0.5) N.push(`Thick wall is capped at ${L(wallTop, 1)} so a thinner tip remains.`);
   if (params.source === 'image' && params.detailEnabled && !shape.details.length) N.push('No inner details found, so no stamp lines were added. Try switching the detail source.');
   if (params.source === 'image' && params.detailEnabled && shape.details.length) N.push(`Stamp lines come from ${shape.detailMode === 'holes' ? 'light marks inside the shape' : 'inner lines of the drawing'}, ${L(Math.abs(params.detailOffset), 1)} below the blade.`);
   warn.innerHTML = W.map(([k, t]) => `<li class="${k}">${t}</li>`).join('');
